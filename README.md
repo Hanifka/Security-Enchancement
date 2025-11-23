@@ -160,6 +160,67 @@ auth_log_path: "/var/log/auth.log"
 syslog_path: "/var/log/syslog"
 ```
 
+## Agent Service - Log Parser Module
+
+The `agent_service` package provides a powerful log parsing and aggregation module that can load and normalize entries from multiple Linux log sources.
+
+### Features
+
+- **Multi-format Support**: Parses auditd, syslog, auth.log, and yum.log files
+- **Flexible Filtering**: Filter by time range, keywords, PIDs, and max entries
+- **Normalized Output**: All log formats are parsed into a unified `LogEntry` structure
+- **Configurable Paths**: Override default log paths via config dict or environment variables
+- **Robust Error Handling**: Gracefully handles missing files and permission errors
+
+### Basic Usage
+
+```python
+from agent_service import collect_logs
+from datetime import datetime, timedelta
+
+# Collect all recent logs
+results = collect_logs(
+    start_time=datetime.now() - timedelta(hours=1),
+    keywords=["ssh", "sudo"],
+    max_entries=100
+)
+
+# Process results
+for log_type, data in results.items():
+    print(f"{log_type}: {data['count']} entries")
+    for entry in data['entries']:
+        print(f"  {entry.timestamp} [{entry.process}] {entry.message}")
+```
+
+### Environment Variable Configuration
+
+```bash
+export LOG_PATH_AUDIT=/var/log/audit/audit.log
+export LOG_PATH_SYSLOG=/var/log/syslog
+export LOG_PATH_AUTH=/var/log/auth.log
+export LOG_PATH_YUM=/var/log/yum.log
+```
+
+### Running Tests
+
+```bash
+# Run all log parser tests
+python3 -m pytest tests/test_log_parser.py -v
+
+# Run with coverage
+python3 -m pytest tests/test_log_parser.py --cov=agent_service
+```
+
+### Example Script
+
+A comprehensive example script is provided:
+
+```bash
+PYTHONPATH=/home/engine/project python3 agent_service/example_usage.py
+```
+
+For detailed documentation, see [agent_service/README.md](agent_service/README.md).
+
 ## Starting the Service
 
 ### Quick Start
