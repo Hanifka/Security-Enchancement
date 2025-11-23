@@ -1,0 +1,222 @@
+/* Custom styles for the Security Monitoring Dashboard */
+
+body {
+    background-color: #f8f9fa;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* Header styling */
+header {
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+/* Card styling */
+.card {
+    border: none;
+    box-shadow: 0 0.125rem 0.25rem rgba(0,0,0,0.075);
+    transition: box-shadow 0.15s ease-in-out;
+}
+
+.card:hover {
+    box-shadow: 0 0.5rem 1rem rgba(0,0,0,0.15);
+}
+
+/* Log summary cards */
+.log-summary-card {
+    border-left: 4px solid;
+}
+
+.log-summary-card.auditd {
+    border-left-color: #dc3545; /* Red */
+}
+
+.log-summary-card.syslog {
+    border-left-color: #198754; /* Green */
+}
+
+.log-summary-card.auth {
+    border-left-color: #0dcaf0; /* Cyan */
+}
+
+.log-summary-card.yum {
+    border-left-color: #ffc107; /* Yellow */
+}
+
+.log-summary-card.default {
+    border-left-color: #6c757d; /* Gray */
+}
+
+/* Payload history items */
+.payload-history-item {
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+    border-left: 3px solid transparent;
+}
+
+.payload-history-item:hover {
+    background-color: #f8f9fa;
+}
+
+.payload-history-item.active {
+    background-color: #e9ecef;
+    border-left-color: #0d6efd;
+}
+
+.payload-history-item.completed {
+    border-left-color: #198754;
+}
+
+.payload-history-item.failed {
+    border-left-color: #dc3545;
+}
+
+.payload-history-item.running {
+    border-left-color: #ffc107;
+}
+
+/* Status badges */
+.status-badge {
+    font-size: 0.75rem;
+}
+
+/* Command textarea */
+#command-input {
+    font-family: 'Courier New', Courier, monospace;
+    resize: vertical;
+}
+
+/* Log entry styling */
+.log-entry {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 0.875rem;
+    line-height: 1.4;
+    background-color: #f8f9fa;
+    padding: 0.5rem;
+    border-radius: 0.25rem;
+    margin-bottom: 0.5rem;
+    border-left: 3px solid #dee2e6;
+}
+
+.log-entry:hover {
+    background-color: #e9ecef;
+}
+
+/* Accordion styling */
+.accordion-button:not(.collapsed) {
+    background-color: #f8f9fa;
+}
+
+.accordion-button:focus {
+    box-shadow: none;
+    border-color: #dee2e6;
+}
+
+/* Loading spinner */
+.spinner-border {
+    width: 3rem;
+    height: 3rem;
+}
+
+/* Empty state styling */
+.empty-state {
+    color: #6c757d;
+}
+
+.empty-state i {
+    opacity: 0.5;
+}
+
+/* Connection status */
+#connection-status.connected {
+    background-color: #198754;
+}
+
+#connection-status.disconnected {
+    background-color: #dc3545;
+}
+
+/* Metadata styling */
+.metadata-item {
+    margin-bottom: 0.5rem;
+}
+
+.metadata-item strong {
+    color: #495057;
+}
+
+/* Stdout/Stderr styling */
+pre {
+    max-height: 200px;
+    overflow-y: auto;
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 0.25rem;
+    padding: 0.75rem;
+    margin: 0;
+}
+
+/* Export button */
+#export-btn {
+    transition: all 0.2s ease;
+}
+
+#export-btn:hover {
+    transform: translateY(-1px);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .container-fluid {
+        padding-left: 1rem;
+        padding-right: 1rem;
+    }
+    
+    .card-body {
+        padding: 1rem;
+    }
+    
+    pre {
+        max-height: 150px;
+        font-size: 0.8rem;
+    }
+}
+
+/* Animation for new items */
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.new-item {
+    animation: slideIn 0.3s ease-out;
+}
+
+/* Log type specific colors */
+.log-type-auditd { color: #dc3545; }
+.log-type-syslog { color: #198754; }
+.log-type-auth { color: #0dcaf0; }
+.log-type-yum { color: #ffc107; }
+
+/* Timestamp styling */
+.timestamp {
+    color: #6c757d;
+    font-size: 0.875rem;
+}
+
+/* Process name styling */
+.process-name {
+    color: #495057;
+    font-weight: 500;
+}
+
+/* Message preview styling */
+.message-preview {
+    color: #212529;
+    word-break: break-word;
+}

@@ -256,69 +256,183 @@ python3 -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 nohup ./start_agent.sh > agent.log 2>&1 &
 ```
 
-## Web Dashboard Workflow
+## Web Dashboard
 
-Once the agent is running, navigate to `http://localhost:3000` (or your configured port).
+The Security Monitoring Dashboard provides a web-based interface for executing payloads and analyzing log results. The dashboard is built with FastAPI backend and Bootstrap frontend.
 
-### 1. Agent Selection
+### Starting the Dashboard
 
-On the home page, you'll see a list of available detection agents. Each agent represents a different detection scenario or testing environment:
+#### Quick Start
 
-- **Auditd Agent** - Core Linux audit monitoring
-- **Sysmon Agent** - Process and file system monitoring
-- **Combined Agent** - All monitoring sources correlated
-- **Custom Agent** - User-defined monitoring profiles
+```bash
+# Using the provided startup script
+./start_dashboard.sh
+```
 
-Select an agent to proceed.
+#### Manual Start
 
-### 2. New Payload
+```bash
+# Create virtual environment (if not exists)
+python3 -m venv venv
+source venv/bin/activate
 
-Once an agent is selected, click **"New Payload"** to configure a detection test:
+# Install dependencies
+pip install -r requirements.txt
 
-- **Payload Type**: Choose from predefined scenarios (File Modification, Command Execution, etc.)
-- **Parameters**: Configure execution parameters (target file, user, timeout, etc.)
-- **Rule Filter**: Optionally filter which detection rules to apply
-- **Logging Level**: Set verbosity (Info, Debug, Trace)
+# Start the server
+python3 main.py
+```
 
-### 3. Execute
+The dashboard will be available at:
+- **Main Dashboard**: http://localhost:8000/dashboard/
+- **API Documentation**: http://localhost:8000/docs
+- **API Root**: http://localhost:8000/
 
-Click **"Execute"** to run the payload:
+### Dashboard Features
 
-- The agent simulates the attack scenario
-- System logs capture the activity
-- The parser analyzes events in real-time
-- Progress indicators show parsing status
+#### 1. Agent Selection
 
-### 4. Viewing Log Groups
+- **Dropdown Selector**: Choose from available monitoring agents
+- **Status Indicators**: Online/offline status for each agent
+- **Agent Information**: Display agent names and IDs
+- **Real-time Updates**: Agent status updates every 30 seconds
 
-After execution, results are organized in **Log Groups** by:
+#### 2. Payload Creation and Execution
 
-- **Event Type** (process, file, network, etc.)
-- **Detection Rule** (matched MITRE ATT&CK techniques)
-- **Timestamp** (with millisecond precision)
-- **Process Information** (PID, user, command line)
+- **Command Input**: Textarea for entering commands to execute
+- **Description Field**: Optional description for payload documentation
+- **Execute Button**: Run payloads with real-time progress feedback
+- **Next Payload**: Reset form for creating new payloads
+- **Loading States**: Visual feedback during payload execution
 
-Click any log group to:
-- View raw event details
-- See matched detection rules
-- Export events in JSON/CSV format
-- Correlate related events across groups
+#### 3. Results Analysis
 
-### 5. Next Payload
+##### Log Summary Cards
+- **Per-log-type Counts**: AUDITD, SYSLOG, AUTH.LOG, YUM, etc.
+- **Color-coded Badges**: Visual indicators for data availability
+- **Path Information**: Source file paths for each log type
+- **Responsive Layout**: Grid layout adapting to screen size
 
-Use **"Next Payload"** to test a new scenario:
+##### Command Metadata
+- **Timestamp**: Execution time with local formatting
+- **Duration**: Execution time in milliseconds
+- **Agent Information**: Selected agent details
+- **Status Indicators**: Success/failure/pending status
 
-- Results from the previous payload are saved
-- A new execution context is created
-- You can compare multiple payload results side-by-side
+##### Standard Output/Error
+- **STDOUT Display**: Command output in formatted text area
+- **STDERR Display**: Error messages with highlighting
+- **Scrollable Areas**: Large output handling with scroll bars
+- **Monospace Font**: Preserved formatting for technical output
 
-### Dashboard Navigation Tips
+##### Log Entries Accordion
+- **Collapsible Panels**: Organized by log type (AUDITD, SYSLOG, etc.)
+- **Entry Counts**: Number of entries per log type
+- **Formatted Display**: Timestamp, process, PID, and message formatting
+- **Hover Effects**: Interactive highlighting of log entries
+- **Limited Display**: Shows first 50 entries to prevent performance issues
 
-- **Time Filter**: Use date/time picker to limit log scope
-- **Rule Search**: Find specific MITRE ATT&CK techniques
-- **Event Export**: Download results in multiple formats
-- **Rule Editor**: View and modify detection rules (admin only)
-- **Settings**: Configure log paths, retention, and performance options
+#### 4. Payload History Sidebar
+
+- **Chronological List**: Recent payloads sorted by timestamp
+- **Status Indicators**: Visual status badges (completed, failed, running)
+- **Command Preview**: Truncated command display for quick identification
+- **Click to Load**: Load previous payload results by clicking history items
+- **Agent Information**: Shows which agent executed each payload
+- **Empty State**: Helpful message when no history exists
+
+#### 5. Export Functionality
+
+- **JSON Export**: Download complete payload data as JSON file
+- **Automatic Naming**: Files named with payload ID for uniqueness
+- **Complete Data**: Includes all metadata, logs, and execution details
+- **Browser Download**: Standard browser download interface
+
+#### 6. Connection Status
+
+- **Real-time Indicator**: Shows API connection status
+- **Auto-recovery**: Automatic reconnection attempts
+- **Visual Feedback**: Color-coded status indicators
+- **Error Handling**: Graceful degradation when API unavailable
+
+### API Endpoints
+
+The dashboard uses these REST API endpoints:
+
+#### Agents
+```bash
+GET /api/agents          # List all available agents
+```
+
+#### Payloads
+```bash
+GET /api/payloads        # List payload history
+POST /api/payloads       # Create and execute new payload
+GET /api/payloads/{id}   # Get specific payload details
+GET /api/payloads/{id}/export  # Export payload as JSON
+```
+
+#### Static Files
+```bash
+GET /dashboard/          # Main dashboard interface
+GET /dashboard/static/*  # Static assets (CSS, JS, images)
+```
+
+### Example Workflow
+
+1. **Start the Dashboard**
+   ```bash
+   ./start_dashboard.sh
+   ```
+
+2. **Open Browser**
+   Navigate to http://localhost:8000/dashboard/
+
+3. **Select Agent**
+   Choose an online agent from the dropdown (e.g., "Security Monitor Alpha")
+
+4. **Create Payload**
+   - Enter command: `ls -la /var/log`
+   - Add description: "List log directory contents"
+   - Click "Execute"
+
+5. **Monitor Execution**
+   - Watch loading indicator
+   - Wait for completion (typically 1-5 seconds)
+
+6. **Review Results**
+   - Check log summary cards for data collected
+   - Review command metadata and output
+   - Expand log entries accordion to examine detailed logs
+   - Export results if needed
+
+7. **Create Next Payload**
+   - Click "Next Payload" to reset form
+   - Enter new command and repeat process
+
+### Error Handling
+
+- **Connection Errors**: Modal dialogs for API failures
+- **Validation Errors**: Form validation with helpful messages
+- **Execution Failures**: Clear error display and retry options
+- **Empty States**: Helpful guidance when no data exists
+- **Timeout Handling**: 30-second timeouts with user feedback
+
+### Performance Considerations
+
+- **Log Limiting**: Maximum 100 entries per log type to prevent browser overload
+- **Periodic Updates**: 30-second intervals for history updates
+- **Lazy Loading**: Results loaded on-demand
+- **Responsive Design**: Optimized for desktop and mobile viewing
+- **Caching**: Browser caching for static assets
+
+### Security Notes
+
+- **Command Validation**: Basic validation for command inputs
+- **Safe Execution**: Limited command set for demonstration
+- **Output Sanitization**: HTML escaping for log display
+- **No Persistent Storage**: In-memory storage for demo purposes
+- **Local Access**: Default configuration for localhost only
 
 ## Bundled Example Payloads
 
