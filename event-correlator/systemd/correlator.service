@@ -1,0 +1,38 @@
+[Unit]
+Description=Event Correlation Engine for Security-Enhancement
+Documentation=https://github.com/security-enhancement/event-correlator
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=correlator
+Group=correlator
+WorkingDirectory=/opt/event-correlator
+ExecStart=/opt/event-correlator/venv/bin/python /opt/event-correlator/correlator.py /opt/event-correlator/config.yaml
+ExecReload=/bin/kill -HUP $MAINPID
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/log /tmp /opt/event-correlator
+
+# Resource limits
+LimitNOFILE=65536
+LimitNPROC=4096
+MemoryMax=512M
+CPUQuota=50%
+
+# Restart settings
+Restart=always
+RestartSec=10
+StartLimitBurst=3
+
+# Environment
+Environment=PYTHONUNBUFFERED=1
+Environment=PATH=/opt/event-correlator/venv/bin:/usr/local/bin:/usr/bin:/bin
+
+[Install]
+WantedBy=multi-user.target

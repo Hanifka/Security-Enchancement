@@ -1,0 +1,265 @@
+# Lateral Movement Detection Configuration
+# This configuration detects various types of lateral movement techniques
+
+input:
+  files:
+    - /var/log/wazuh/active-responses.log
+    - /var/log/syslog
+    - /var/log/auth.log
+    - /tmp/network_events.log
+  poll_interval: 2
+
+output:
+  default_file: /tmp/lateral_movement_correlations.jsonl
+  format: jsonl
+
+database:
+  path: /tmp/lateral_movement_state.db
+
+# Lateral Movement Correlation Rules
+rules:
+  # SSH Lateral Movement (Multiple hosts from same user)
+  - name: 'ssh_lateral_movement'
+    pattern_type: 'sequence'
+    description: 'Detect SSH lateral movement - user accessing multiple hosts'
+    enabled: true
+    conditions:
+      - field: 'data.event_type'
+        equals: 'ssh_login'
+      - field: 'data.status'
+        equals: 'success'
+      - field: 'data.user'
+        not_equals: 'root'
+    window: 3600  # 1 hour
+    min_occurrences: 3  # SSH to 3+ different hosts
+    max_occurrences: 20
+    entity_path: 'data.user'
+    timestamp_path: 'timestamp'
+    ttl: 7200  # 2 hours
+    output_file: /tmp/ssh_lateral_movement.jsonl
+    
+  # Network Scanning Detection
+  - name: 'network_scanning'
+    pattern_type: 'threshold'
+    description: 'Detect network scanning - multiple connection attempts to different hosts'
+    enabled: true
+    conditions:
+      - field: 'data.event_type'
+        equals: 'network_connection'
+      - field: 'data.action'
+        equals: 'attempted'
+      - field: 'data.dstip'
+        pattern: '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$'
+        not_equals: '127.0.0.1'
+    window: 300  # 5 minutes
+    min_occurrences: 10
+    max_occurrences: 100
+    entity_path: 'data.srcip'
+    timestamp_path: 'timestamp'
+    ttl: 3600
+    output_file: /tmp/network_scanning.jsonl
+    
+  # Privilege Escalation + File Access
+  - name: 'privilege_escalation_file_access'
+    pattern_type: 'sequence'
+    description: 'Detect privilege escalation followed by sensitive file access'
+    enabled: true
+    conditions:
+      - field: 'data.event_type'
+        equals: 'privilege_escalation'
+      - field: 'data.event_type'
+        equals: 'file_access'
+      - field: 'data.file.path'
+        pattern: '.*(/etc/passwd|/etc/shadow|/etc/sudoers|/root/.*|/var/log/.*).*'
+    window: 600  # 10 minutes
+    min_occurrences: 2
+    max_occurrences: 10
+    entity_path: 'data.user'
+    timestamp_path: 'timestamp'
+    ttl: 3600
+    output_file: /tmp/privilege_escalation_file_access.jsonl
+    
+  # Command Execution Across Systems
+  - name: 'command_execution_lateral_movement'
+    pattern_type: 'composite'
+    description: 'Detect command execution indicating lateral movement'
+    enabled: true
+    conditions:
+      - field: 'data.event_type'
+        equals: 'command_execution'
+      - field: 'data.command'
+        pattern: '.*(wget|curl|nc|netcat|telnet|ssh|scp|rsync).*'
+      - field: 'data.user'
+        not_equals: 'root'
+    window: 900  # 15 minutes
+    min_occurrences: 2
+    max_occurrences: 15
+    entity_path: 'data.user'
+    timestamp_path: 'timestamp'
+    ttl: 7200
+    output_file: /tmp/command_execution_lateral_movement.jsonl
+    
+  # Internal Network Connections
+  - name: 'internal_network_connections'
+    pattern_type: 'threshold'
+    description: 'Detect connections to internal network resources'
+    enabled: true
+    conditions:
+      - field: 'data.event_type'
+        equals: 'network_connection'
+      - field: 'data.dstip'
+        pattern: '^(10\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.).*'  # Private IP ranges
+        not_equals: '127.0.0.1'
+    window: 1800  # 30 minutes
+    min_occurrences: 5
+    max_occurrences: 50
+    entity_path: 'data.srcip'
+    timestamp_path: 'timestamp'
+    ttl: 3600
+    output_file: /tmp/internal_network_connections.jsonl
+    
+  # Service Discovery
+  - name: 'service_discovery'
+    pattern_type: 'sequence'
+    description: 'Detect service discovery activities'
+    enabled: true
+    conditions:
+      - field: 'data.event_type'
+        equals: 'command_execution'
+      - field: 'data.command'
+        pattern: '.*(nmap|netstat|ss|arp|nslookup|dig|host).*'
+      - field: 'data.event_type'
+        equals: 'network_connection'
+    window: 1800  # 30 minutes
+    min_occurrences: 2
+    max_occurrences: 10
+    entity_path: 'data.user'
+    timestamp_path: 'timestamp'
+    ttl: 7200
+    output_file: /tmp/service_discovery.jsonl
+    
+  # Credential Harvesting
+  - name: 'credential_harvesting'
+    pattern_type: 'composite'
+    description: 'Detect credential harvesting activities'
+    enabled: true
+    conditions:
+      - field: 'data.event_type'
+        equals: 'file_access'
+      - field: 'data.file.path'
+        pattern: '.*(/etc/passwd|/etc/shadow|/etc/group|/etc/sudoers|/home/.*/.ssh/.*).*'
+      - field: 'data.action'
+        equals: 'read'
+    window: 900  # 15 minutes
+    min_occurrences: 3
+    max_occurrences: 20
+    entity_path: 'data.user'
+    timestamp_path: 'timestamp'
+    ttl: 14400  # 4 hours
+    output_file: /tmp/credential_harvesting.jsonl
+    
+  # Windows-Specific Lateral Movement (if monitoring Windows)
+  - name: 'windows_lateral_movement'
+    pattern_type: 'sequence'
+    description: 'Detect Windows lateral movement techniques'
+    enabled: true
+    conditions:
+      - field: 'data.event_type'
+        equals: 'process_creation'
+      - field: 'data.process.name'
+        pattern: '.*(psexec|wmiexec|smbexec|metasploit|cobalt).*'
+      - field: 'data.event_type'
+        equals: 'network_connection'
+    window: 300  # 5 minutes
+    min_occurrences: 2
+    max_occurrences: 10
+    entity_path: 'data.user'
+    timestamp_path: 'timestamp'
+    ttl: 3600
+    output_file: /tmp/windows_lateral_movement.jsonl
+    
+  # Pass-the-Hash Detection
+  - name: 'pass_the_hash'
+    pattern_type: 'composite'
+    description: 'Detect pass-the-hash attack patterns'
+    enabled: true
+    conditions:
+      - field: 'data.event_type'
+        equals: 'authentication'
+      - field: 'data.auth.method'
+        equals: 'ntlm'
+      - field: 'data.user'
+        not_equals: 'anonymous'
+    window: 300  # 5 minutes
+    min_occurrences: 5
+    max_occurrences: 30
+    entity_path: 'data.srcip'
+    timestamp_path: 'timestamp'
+    ttl: 1800
+    output_file: /tmp/pass_the_hash.jsonl
+    
+  # Automated Lateral Movement
+  - name: 'automated_lateral_movement'
+    pattern_type: 'threshold'
+    description: 'Detect automated lateral movement scripts'
+    enabled: true
+    conditions:
+      - field: 'data.event_type'
+        equals: 'script_execution'
+      - field: 'data.script.type'
+        pattern: '.*(powershell|bash|python|perl|ruby).*'
+      - field: 'data.user'
+        not_equals: 'root'
+    window: 600  # 10 minutes
+    min_occurrences: 5
+    max_occurrences: 50
+    entity_path: 'data.srcip'
+    timestamp_path: 'timestamp'
+    ttl: 3600
+    output_file: /tmp/automated_lateral_movement.jsonl
+
+# Logging configuration
+logging:
+  level: INFO
+  file: /var/log/lateral_movement_correlator.log
+  max_size: 10MB
+  backup_count: 5
+
+# Performance tuning
+performance:
+  batch_size: 100
+  max_memory_mb: 512
+  cleanup_interval: 300
+
+# Enhanced alerting for lateral movement
+alerting:
+  immediate_alert:
+    - ssh_lateral_movement
+    - privilege_escalation_file_access
+    - credential_harvesting
+    - automated_lateral_movement
+  notification_methods:
+    - file: /var/log/lateral_movement_alerts.log
+    - webhook: http://localhost:8080/lateral_movement_alert
+    - siem: http://localhost:9000/api/alerts  # Generic SIEM integration
+
+# Threat intelligence integration
+threat_intelligence:
+  # Known malicious IPs
+  malicious_ips:
+    - '192.168.1.100'
+    - '10.0.0.50'
+  
+  # Known suspicious user agents
+  suspicious_user_agents:
+    - 'sqlmap'
+    - 'nmap'
+    - 'masscan'
+    - 'zgrab'
+  
+  # Anomaly detection settings
+  baseline:
+    normal_login_count: 5
+    normal_host_access: 3
+    normal_network_connections: 20
+    time_window_hours: 24

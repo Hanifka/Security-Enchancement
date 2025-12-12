@@ -11,6 +11,7 @@ The Linux Detection Engineering Agent is a full-stack security detection platfor
 - **FastAPI Backend**: RESTful API for log ingestion, parsing, and analysis
 - **Web Dashboard**: Interactive interface for executing detection payloads and analyzing results
 - **Log Parser**: Intelligent parser that correlates auditd and Sysmon events with custom detection logic
+- **Event Correlation Engine**: Real-time pattern detection and correlation across multiple event sources
 
 This platform is designed for security engineers who need to:
 - Test detection rules against simulated attack scenarios
@@ -45,6 +46,15 @@ This platform is designed for security engineers who need to:
 │  • Event correlation and enrichment                     │
 │  • Detection rule evaluation                            │
 │  • Result caching in static/results directory           │
+└──────────────────────┬──────────────────────────────────┘
+                       │
+┌──────────────────────▼──────────────────────────────────┐
+│              Event Correlation Engine                   │
+│  • JSON event tailing and pattern matching              │
+│  • Sequence + threshold detection                       │
+│  • In-memory state + SQLite persistence                 │
+│  • Wazuh integration and real-time correlation          │
+│  • Custom YAML-driven correlation rules                 │
 └──────────────────────┬──────────────────────────────────┘
                        │
 ┌──────────────────────▼──────────────────────────────────┐
@@ -199,6 +209,86 @@ export LOG_PATH_AUDIT=/var/log/audit/audit.log
 export LOG_PATH_SYSLOG=/var/log/syslog
 export LOG_PATH_AUTH=/var/log/auth.log
 export LOG_PATH_YUM=/var/log/yum.log
+```
+
+## Event Correlation Engine
+
+The `event-correlator` module provides a lightweight, production-ready event correlation engine for detecting security patterns across multiple event sources. It's designed to integrate seamlessly with Wazuh and other security monitoring tools.
+
+### Features
+
+- **Real-time Event Processing**: JSON event tailing with automatic file rotation handling
+- **Pattern Detection**: Supports threshold, sequence, and composite pattern matching
+- **State Management**: In-memory state with optional SQLite persistence
+- **YAML Configuration**: Easy-to-manage correlation rules and settings
+- **Wazuh Integration**: Built-in support for Wazuh events and alerts
+- **Production Ready**: Comprehensive logging, error handling, and monitoring
+
+### Quick Start
+
+```bash
+# Navigate to the correlation engine directory
+cd event-correlator
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Test with sample data
+./test_patterns.sh dry-run
+
+# Run correlation engine
+python3 correlator.py config.yaml
+```
+
+### Configuration Example
+
+```yaml
+input:
+  files:
+    - /var/log/wazuh/active-responses.log
+  poll_interval: 1
+
+rules:
+  - name: "ssh_brute_force"
+    pattern_type: "threshold"
+    conditions:
+      - field: "data.event_type"
+        equals: "ssh_login"
+      - field: "data.status"
+        equals: "failed"
+    window: 300  # 5 minutes
+    min_occurrences: 5
+    entity_path: "data.srcip"
+```
+
+### Built-in Detections
+
+The correlation engine includes pre-configured rules for:
+
+- **Brute Force Attacks**: SSH, web application, database, and password spraying
+- **Lateral Movement**: SSH lateral movement, network scanning, privilege escalation
+- **Privilege Escalation**: sudo abuse, credential harvesting, file access patterns
+- **Suspicious Activity**: Process injection, time manipulation, data exfiltration
+
+### Installation Methods
+
+1. **Manual Installation**: Direct Python execution with configuration files
+2. **Systemd Service**: Production deployment as a system service
+3. **Docker**: Containerized deployment for scalability
+4. **Development**: Local testing and rule development
+
+For detailed documentation, see [`event-correlator/README.md`](event-correlator/README.md).
+
+### Wazuh Integration
+
+The correlation engine integrates with Wazuh through multiple methods:
+
+- **Active Response**: Send events via Wazuh's active response capability
+- **Socket Output**: Forward events through Unix sockets
+- **Webhook Integration**: HTTP webhook endpoints for real-time processing
+- **Direct Log Monitoring**: Monitor Wazuh log files directly
+
+See [`event-correlator/examples/wazuh_integration.md`](event-correlator/examples/wazuh_integration.md) for complete integration instructions.
 ```
 
 ### Running Tests

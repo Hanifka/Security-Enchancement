@@ -1,0 +1,182 @@
+# Brute Force Detection Configuration
+# This configuration detects various types of brute force attacks
+
+input:
+  files:
+    - /var/log/wazuh/active-responses.log
+    - /tmp/ssh_events.log
+    - /var/log/auth.log
+  poll_interval: 1
+
+output:
+  default_file: /tmp/brute_force_correlations.jsonl
+  format: jsonl
+
+database:
+  path: /tmp/brute_force_state.db
+
+# Brute Force Correlation Rules
+rules:
+  # SSH Brute Force Detection
+  - name: 'ssh_brute_force'
+    pattern_type: 'threshold'
+    description: 'Detect SSH brute force attacks - multiple failed logins from same IP'
+    enabled: true
+    conditions:
+      - field: 'data.event_type'
+        equals: 'ssh_login'
+      - field: 'data.status'
+        equals: 'failed'
+      - field: 'data.srcip'
+        pattern: '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$'
+        not_equals: '127.0.0.1'
+    window: 300  # 5 minutes
+    min_occurrences: 5
+    max_occurrences: 50
+    entity_path: 'data.srcip'
+    timestamp_path: 'timestamp'
+    ttl: 1800  # 30 minutes
+    output_file: /tmp/ssh_brute_force.jsonl
+    
+  # Web Application Brute Force
+  - name: 'web_brute_force'
+    pattern_type: 'threshold'
+    description: 'Detect web application brute force attacks'
+    enabled: true
+    conditions:
+      - field: 'rule.category'
+        equals: 'web_attack'
+      - field: 'data.event_type'
+        equals: 'web_attack'
+      - field: 'data.srcip'
+        pattern: '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$'
+        not_equals: '127.0.0.1'
+    window: 600  # 10 minutes
+    min_occurrences: 10
+    max_occurrences: 100
+    entity_path: 'data.srcip'
+    timestamp_path: 'timestamp'
+    ttl: 3600  # 1 hour
+    output_file: /tmp/web_brute_force.jsonl
+    
+  # Database Brute Force Detection
+  - name: 'database_brute_force'
+    pattern_type: 'threshold'
+    description: 'Detect database brute force attacks'
+    enabled: true
+    conditions:
+      - field: 'data.program'
+        pattern: '.*(mysql|postgresql|oracle).*'
+      - field: 'data.message'
+        pattern: '.*access denied.*'
+      - field: 'data.srcip'
+        pattern: '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$'
+    window: 900  # 15 minutes
+    min_occurrences: 3
+    max_occurrences: 30
+    entity_path: 'data.srcip'
+    timestamp_path: 'timestamp'
+    ttl: 3600
+    output_file: /tmp/database_brute_force.jsonl
+    
+  # Multiple User Brute Force (password spraying)
+  - name: 'password_spraying'
+    pattern_type: 'threshold'
+    description: 'Detect password spraying - same IP attempting multiple users'
+    enabled: true
+    conditions:
+      - field: 'data.event_type'
+        equals: 'ssh_login'
+      - field: 'data.status'
+        equals: 'failed'
+      - field: 'data.user'
+        not_equals: 'root'
+        not_equals: 'admin'
+        not_equals: 'administrator'
+    window: 1800  # 30 minutes
+    min_occurrences: 15
+    max_occurrences: 100
+    entity_path: 'data.srcip'
+    timestamp_path: 'timestamp'
+    ttl: 7200  # 2 hours
+    output_file: /tmp/password_spraying.jsonl
+    
+  # Brute Force with Successful Login
+  - name: 'successful_brute_force'
+    pattern_type: 'sequence'
+    description: 'Detect successful login after brute force attempts'
+    enabled: true
+    conditions:
+      - field: 'data.event_type'
+        equals: 'ssh_login'
+        # Multiple failed attempts will be added automatically
+    window: 3600  # 1 hour
+    min_occurrences: 6  # 5 failures + 1 success
+    max_occurrences: 20
+    entity_path: 'data.srcip'
+    timestamp_path: 'timestamp'
+    ttl: 7200
+    output_file: /tmp/successful_brute_force.jsonl
+    
+  # Rapid Login Attempts
+  - name: 'rapid_login_attempts'
+    pattern_type: 'threshold'
+    description: 'Detect extremely rapid login attempts'
+    enabled: true
+    conditions:
+      - field: 'data.event_type'
+        equals: 'ssh_login'
+      - field: 'data.srcip'
+        pattern: '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$'
+    window: 60  # 1 minute
+    min_occurrences: 20
+    entity_path: 'data.srcip'
+    timestamp_path: 'timestamp'
+    ttl: 1800
+    output_file: /tmp/rapid_login_attempts.jsonl
+    
+  # Geographic Anomaly Detection
+  - name: 'unusual_location_brute_force'
+    pattern_type: 'composite'
+    description: 'Detect brute force from unusual geographic locations'
+    enabled: true
+    conditions:
+      - field: 'data.event_type'
+        equals: 'ssh_login'
+      - field: 'data.status'
+        equals: 'failed'
+      - field: 'data.geo.country'
+        not_equals: 'US'  # Adjust based on your environment
+        not_equals: 'CA'
+        not_equals: 'UK'
+        not_equals: 'DE'
+    window: 1800  # 30 minutes
+    min_occurrences: 3
+    entity_path: 'data.srcip'
+    timestamp_path: 'timestamp'
+    ttl: 14400  # 4 hours
+    output_file: /tmp/unusual_location_brute_force.jsonl
+
+# Logging configuration
+logging:
+  level: INFO
+  file: /var/log/brute_force_correlator.log
+  max_size: 10MB
+  backup_count: 5
+
+# Performance tuning
+performance:
+  batch_size: 100
+  max_memory_mb: 256
+  cleanup_interval: 300
+
+# Alert thresholds (when to trigger immediate alerts)
+alerting:
+  immediate_alert:
+    - ssh_brute_force
+    - successful_brute_force
+    - rapid_login_attempts
+  notification_methods:
+    - file: /var/log/brute_force_alerts.log
+    - email: security@company.com  # Configure SMTP
+    - webhook: http://localhost:8080/alert
