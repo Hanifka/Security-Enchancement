@@ -1,0 +1,179 @@
+# Event Correlation Engine Configuration
+# This configuration defines patterns for detecting security threats
+
+# Input configuration
+input:
+  # Files to monitor for JSON events
+  files:
+    - /var/log/wazuh/active-responses.log
+    - /var/log/wazuh/alerts.json
+  # Polling interval in seconds
+  poll_interval: 1
+
+# Output configuration
+output:
+  # Default output file for correlation matches
+  default_file: /tmp/correlations.jsonl
+  # Output format options
+  format: jsonl
+
+# Database configuration for state persistence
+database:
+  path: /tmp/correlator_state.db
+  backup_interval: 3600  # seconds
+
+# Correlation Rules
+rules:
+  # Brute Force Detection
+  - name: "brute_force_ssh"
+    pattern_type: "threshold"
+    description: "Detect multiple failed SSH login attempts from the same source"
+    enabled: true
+    conditions:
+      - field: "data.srcip"
+        pattern: '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$'  # Valid IP address
+      - field: "data.srcip"
+        not_equals: "127.0.0.1"  # Exclude localhost
+    window: 300  # 5 minutes
+    min_occurrences: 5
+    max_occurrences: 50
+    entity_path: "data.srcip"
+    timestamp_path: "timestamp"
+    rule_id_path: "rule.id"
+    ttl: 3600  # 1 hour
+    output_file: /tmp/brute_force_alerts.jsonl
+    
+  # Lateral Movement Detection
+  - name: "lateral_movement"
+    pattern_type: "sequence"
+    description: "Detect lateral movement through network connections"
+    enabled: true
+    conditions:
+      - field: "data.event_type"
+        equals: "ssh_login"
+      - field: "data.event_type"
+        equals: "file_access"
+      - field: "data.event_type"
+        equals: "command_execution"
+    window: 900  # 15 minutes
+    entity_path: "data.user.name"
+    timestamp_path: "timestamp"
+    ttl: 7200  # 2 hours
+    output_file: /tmp/lateral_movement_alerts.jsonl
+    
+  # Privilege Escalation Detection
+  - name: "privilege_escalation"
+    pattern_type: "composite"
+    description: "Detect privilege escalation attempts"
+    enabled: true
+    conditions:
+      - field: "data.rule.category"
+        pattern: '.*privilege.*'
+      - field: "data.program"
+        pattern: '.*(sudo|su|doas).*'
+    window: 600  # 10 minutes
+    min_occurrences: 2
+    entity_path: "data.user.name"
+    timestamp_path: "timestamp"
+    ttl: 3600
+    output_file: /tmp/privilege_escalation_alerts.jsonl
+    
+  # Suspicious File Access Detection
+  - name: "suspicious_file_access"
+    pattern_type: "threshold"
+    description: "Detect access to sensitive files"
+    enabled: true
+    conditions:
+      - field: "data.file.path"
+        pattern: '.*(/etc/passwd|/etc/shadow|/etc/sudoers|/root/.*).*'
+    window: 1800  # 30 minutes
+    min_occurrences: 10
+    entity_path: "data.user.name"
+    timestamp_path: "timestamp"
+    ttl: 7200
+    output_file: /tmp/file_access_alerts.jsonl
+    
+  # Web Application Attack Detection
+  - name: "web_attack"
+    pattern_type: "threshold"
+    description: "Detect web application attacks"
+    enabled: true
+    conditions:
+      - field: "data.rule.category"
+        equals: "web_attack"
+      - field: "data.srcip"
+        not_equals: "127.0.0.1"
+    window: 600  # 10 minutes
+    min_occurrences: 3
+    entity_path: "data.srcip"
+    timestamp_path: "timestamp"
+    ttl: 3600
+    output_file: /tmp/web_attack_alerts.jsonl
+    
+  # Data Exfiltration Detection
+  - name: "data_exfiltration"
+    pattern_type: "composite"
+    description: "Detect potential data exfiltration"
+    enabled: true
+    conditions:
+      - field: "data.event_type"
+        equals: "large_file_transfer"
+      - field: "data.bytes_out"
+        greater_than: 1048576  # 1MB
+    window: 300  # 5 minutes
+    min_occurrences: 1
+    entity_path: "data.user.name"
+    timestamp_path: "timestamp"
+    ttl: 1800  # 30 minutes
+    output_file: /tmp/data_exfiltration_alerts.jsonl
+    
+  # Process Injection Detection
+  - name: "process_injection"
+    pattern_type: "sequence"
+    description: "Detect process injection techniques"
+    enabled: true
+    conditions:
+      - field: "data.event_type"
+        equals: "process_start"
+      - field: "data.event_type"
+        equals: "memory_allocate"
+      - field: "data.event_type"
+        equals: "memory_write"
+    window: 60  # 1 minute
+    entity_path: "data.process.pid"
+    timestamp_path: "timestamp"
+    ttl: 1800
+    output_file: /tmp/process_injection_alerts.jsonl
+    
+  # System Time Manipulation Detection
+  - name: "time_manipulation"
+    pattern_type: "threshold"
+    description: "Detect system time changes"
+    enabled: true
+    conditions:
+      - field: "data.program"
+        equals: "date"
+      - field: "data.command"
+        pattern: '.*set.*time.*'
+    window: 1800  # 30 minutes
+    min_occurrences: 1
+    entity_path: "data.user.name"
+    timestamp_path: "timestamp"
+    ttl: 3600
+    output_file: /tmp/time_manipulation_alerts.jsonl
+
+# Logging configuration
+logging:
+  level: INFO
+  file: /var/log/correlator.log
+  max_size: 10MB
+  backup_count: 5
+
+# Performance tuning
+performance:
+  # Maximum number of events to process per batch
+  batch_size: 100
+  # Memory limit for state (MB)
+  max_memory_mb: 512
+  # Cleanup interval (seconds)
+  cleanup_interval: 300
