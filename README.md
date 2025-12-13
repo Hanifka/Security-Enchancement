@@ -955,6 +955,176 @@ To monitor logs on remote systems:
 # ✗ /opt/custom/logs/security.log (permission denied)
 ```
 
+## EQL Engine API
+
+The EQL Engine provides a FastAPI REST API for testing Event Query Language queries and managing detection rules.
+
+### Running the EQL API Server
+
+```bash
+# Start the API server (runs on port 8001 by default)
+uvicorn eql_engine.api:app --host 0.0.0.0 --port 8001 --reload
+```
+
+### API Endpoints
+
+#### Test Endpoint
+```
+POST /api/test
+```
+Test an EQL query against event data. Validates events for required fields and returns matches with statistics.
+
+**Request:**
+```json
+{
+  "query": "filter(process.name == \"cmd.exe\")",
+  "events": [
+    {"process.name": "cmd.exe", "timestamp": "2024-01-15T10:30:00"},
+    {"process.name": "notepad.exe", "timestamp": "2024-01-15T10:30:01"}
+  ]
+}
+```
+
+**Response:**
+```json
+{
+  "matches": [
+    {
+      "events": [{"process.name": "cmd.exe", "timestamp": "2024-01-15T10:30:00"}],
+      "timestamp": "2024-01-15T10:30:00",
+      "group_key": null
+    }
+  ],
+  "total_matches": 1,
+  "total_events_processed": 2,
+  "execution_time_ms": 1.23,
+  "validation_state": {
+    "is_valid": true,
+    "errors": [],
+    "warnings": []
+  },
+  "errors": []
+}
+```
+
+#### Rules Management
+
+```
+GET /api/rules
+```
+List all saved rules.
+
+```
+POST /api/rules
+```
+Create a new rule.
+
+**Request:**
+```json
+{
+  "name": "Detect Shell Execution",
+  "description": "Detects execution of cmd.exe or powershell",
+  "severity": "high",
+  "query": "filter(process.name == /cmd.*\\.exe|powershell.*\\.exe/)"
+}
+```
+
+```
+GET /api/rules/{rule_id}
+```
+Get a specific rule by ID.
+
+```
+PUT /api/rules/{rule_id}
+```
+Update an existing rule.
+
+```
+DELETE /api/rules/{rule_id}
+```
+Delete a rule.
+
+```
+GET /api/rules/export/download
+```
+Export all rules as JSON.
+
+#### Health Check
+```
+GET /health
+```
+Health check endpoint to verify API is running.
+
+### EQL Query Syntax
+
+The EQL Engine supports three query types:
+
+**Filter Query** - Match events based on conditions:
+```eql
+filter(process.name == "cmd.exe")
+filter(process.name == "cmd.exe" and process.pid > 100)
+filter(process.name == /cmd.*\.exe/)
+```
+
+**Sequence Query** - Match sequences of events:
+```eql
+sequence[
+  filter(event_type == "login"),
+  filter(event_type == "command")
+] | timerange 30s
+```
+
+**Threshold Query** - Match when event count exceeds threshold:
+```eql
+threshold(filter(event_code == 4625), min_count = 5) | timerange 5m
+```
+
+### Operators
+
+- Comparison: `==`, `!=`, `>`, `<`, `>=`, `<=`
+- Logic: `and`
+- Regex: `/pattern/`
+- Grouping: `by field1, field2`
+- Timerange: `| timerange 30s` (seconds), `5m` (minutes), `2h` (hours)
+
+### Environment Variables
+
+The following environment variables can be configured:
+
+- `EQL_RULES_PATH`: Path to rules JSON file (default: `eql_engine/rules.json`)
+- `EQL_API_BASE_PATH`: Base path for API endpoints (default: `/api`)
+
+### Storage
+
+Rules are stored in JSON format at `eql_engine/rules.json` with the following schema:
+
+```json
+{
+  "id": "unique-rule-id",
+  "name": "Rule Name",
+  "description": "Rule description",
+  "severity": "low|medium|high|critical",
+  "query": "EQL query string",
+  "created_at": "2024-01-15T10:00:00",
+  "updated_at": "2024-01-15T10:00:00"
+}
+```
+
+### Testing
+
+Run the EQL API test suite:
+
+```bash
+pytest tests/test_eql_api.py -v
+```
+
+The test suite includes:
+- Event validation tests
+- Query execution tests (filter, sequence, threshold)
+- CRUD operations for rules
+- Storage persistence tests
+- Timestamp handling tests
+
 ## Troubleshooting
 
 ### Agent Won't Start
