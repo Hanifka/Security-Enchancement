@@ -1,0 +1,47 @@
+[
+  {
+    "id": "rule-001",
+    "name": "Detect Command Shell Execution",
+    "description": "Detects execution of cmd.exe or powershell.exe",
+    "severity": "medium",
+    "query": "filter(process.name == /cmd.*\\.exe|powershell.*\\.exe/)",
+    "created_at": "2024-01-15T10:00:00",
+    "updated_at": "2024-01-15T10:00:00"
+  },
+  {
+    "id": "rule-002",
+    "name": "Suspicious Event Code Sequence",
+    "description": "Detects sequence of suspicious Windows event codes",
+    "severity": "high",
+    "query": "filter(event.code == 4688) by process.pid",
+    "created_at": "2024-01-15T10:00:00",
+    "updated_at": "2024-01-15T10:00:00"
+  },
+  {
+    "id": "rule-003",
+    "name": "Multiple Failed Logins",
+    "description": "Detects threshold of failed login attempts",
+    "severity": "high",
+    "query": "threshold(filter(event.code == 4625), min_count = 5) | timerange 5m",
+    "created_at": "2024-01-15T10:00:00",
+    "updated_at": "2024-01-15T10:00:00"
+  },
+  {
+    "id": "rule-004",
+    "name": "Process Creation and File Access Pattern",
+    "description": "Detects process creation followed by file access",
+    "severity": "medium",
+    "query": "sequence[filter(event.code == 1), filter(event.code == 11)] | timerange 30s",
+    "created_at": "2024-01-15T10:00:00",
+    "updated_at": "2024-01-15T10:00:00"
+  },
+  {
+    "id": "rule-005",
+    "name": "Unusual Network Destination",
+    "description": "Detects network connections to unusual destinations",
+    "severity": "low",
+    "query": "filter(network.destination_port != 80 and network.destination_port != 443 and network.destination_port != 53)",
+    "created_at": "2024-01-15T10:00:00",
+    "updated_at": "2024-01-15T10:00:00"
+  }
+]
